@@ -78,7 +78,7 @@ class ConcurrentFixtureGroup:
         self.namespace[self.parent_fixture_name] = asyncio_fixture(self._parent_func(), name=self.parent_fixture_name,
                                                                    **self.fixture_params)
 
-    def fixture(self, func=None, name: str = None, autouse: Optional[bool] = None):
+    def fixture(self, func=None, *, name: Optional[str] = None, autouse: Optional[bool] = None):
         if func is None:
             return partial(self.fixture, autouse=autouse, name=name)
         if name is None:

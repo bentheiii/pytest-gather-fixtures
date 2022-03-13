@@ -1,11 +1,15 @@
 Welcome to the pytest-gather-fixtures python SDK documentation!
-=====================================================
+====================================================================
 
 .. toctree::
     :maxdepth: 2
     :caption: Contents:
 
-    Introduction
+    introduction
+    abstract
+    api
+    skipping_fixtures
+    parametrization
 
 `source code <https://github.com/bentheiii/pytest-gather-fixtures>`_
 
