@@ -58,6 +58,7 @@ def test_skip_keep_dependants(teardown_parallel_check, s1, s2, s4, parallel_chec
     parallel_checker.assert_concurrent(
         ['1_start', '2_start', '4_start'],
     )
+    assert '3_start' not in parallel_checker.contexts
     assert fx == [True]
 
 

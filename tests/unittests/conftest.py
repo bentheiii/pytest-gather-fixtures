@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from itertools import chain
 from typing import Iterable
 
 from pytest import fixture
@@ -39,6 +40,20 @@ class ParallelChecker:
                     break
             else:
                 assert False, f"{expected_group} not in contexts, found {self.contexts}"
+
+    def assert_not_concurrent(self, *ordered_groups: Iterable[Iterable[str]]):
+        all_elements = set(chain.from_iterable(ordered_groups))
+        groups_iter = iter(ordered_groups)
+        next_group = set(next(groups_iter))
+        for group in self.context_groups():
+            if len(all_elements & group) > 1:
+                assert False, f"{all_elements & group} in parallel, found {self.contexts}"
+            next_group -= group
+            if not next_group:
+                try:
+                    next_group = set(next(groups_iter))
+                except StopIteration:
+                    break
 
 
 @fixture(scope="session")

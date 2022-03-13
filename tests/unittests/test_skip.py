@@ -46,6 +46,7 @@ def test_skip_one(teardown_parallel_check, s1, s2, s4, parallel_checker, ):
     parallel_checker.assert_concurrent(
         ['1_start', '2_start', '4_start'],
     )
+    assert '3_start' not in parallel_checker.contexts
 
 
 def test_skip_two(teardown_parallel_check, s1, s2, s3, parallel_checker, ):
@@ -68,4 +69,5 @@ def teardown_parallel_check(parallel_checker):
         ['1_start', '2_start', '3_start'],
         ['3_tear'],
     )
+    parallel_checker.assert_not_concurrent(['4_start', '3_start'])
     parallel_checker.clear()
