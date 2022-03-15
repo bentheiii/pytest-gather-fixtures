@@ -10,6 +10,7 @@ Welcome to the pytest-gather-fixtures python SDK documentation!
     api
     skipping_fixtures
     parametrization
+    error_handling
 
 `source code <https://github.com/bentheiii/pytest-gather-fixtures>`_
 

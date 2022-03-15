@@ -82,3 +82,58 @@ In order to avoid conflicts, users can change the name of the injected fixture b
 
     assert some_other_name  # this name has been injected into the caller's namespace
     assert isinstance(_cfg_my_group, str)  # the original name is preserved
+
+External Child Dependencies
+----------------------------------
+
+Child fixture can depend on external fixtures, they are loaded as a dependencies of the parent fixture.
+
+.. code-block:: python
+
+    @fixture
+    def my_fixture():
+        return 10
+
+    my_group = ConcurrentFixtureGroup('my_group')
+
+    @my_group.fixture
+    async def fixture_1(monkeypatch):
+        await asyncio.sleep(1)
+        with monkeypatch.setenv('MY_ENV_VAR', '1'):
+            return 1
+
+    @my_group.fixture
+    async def fixture_2(my_fixture):
+        await asyncio.sleep(2)
+        return my_fixture * 10
+
+Internal Child Dependencies
+-------------------------------
+
+Child fixtures can depend on other child fixtures, the dependant coroutines are only run when their dependencies are
+finished.
+
+.. code-block:: python
+
+    my_group = ConcurrentFixtureGroup('my_group')
+
+    @my_group.fixture
+    async def fixture_1():
+        await asyncio.sleep(1)
+        return 1
+
+    @my_group.fixture
+    async def fixture_2():
+        await asyncio.sleep(2)
+        return 2
+
+    @my_group.fixture
+    async def fixture_3(fixture_1):
+        await asyncio.sleep(2)
+        return fixture_1 * 2
+
+The following group of fixtures will be executed in parallel, but fixture_3 will only be run after fixture_1 has
+completed, so the entire group will take 3 seconds to complete.
+
+In these cases, teardown happens in the reverse order. i.e. fixture_1 will only be torn down after fixture_3 has
+been torn down.

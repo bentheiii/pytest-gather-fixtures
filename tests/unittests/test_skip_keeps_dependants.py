@@ -15,7 +15,7 @@ def set_fx(fx):
     fx.append(True)
 
 
-Foo = ConcurrentFixtureGroup('Foo', autouse_children=False)
+Foo = ConcurrentFixtureGroup('Foo', autoskip_children=True)
 
 
 @Foo.fixture

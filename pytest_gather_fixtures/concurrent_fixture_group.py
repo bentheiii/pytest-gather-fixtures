@@ -12,7 +12,7 @@ from typing import Any, AsyncGenerator, Callable, Container, Dict, List, Optiona
 from pytest import fixture
 from pytest_asyncio import fixture as asyncio_fixture
 
-from pytest_gather_fixtures.topology import Topology
+from pytest_gather_fixtures.topology import TopologicalExecution, Topology
 
 
 def fix_to_generator(fix) -> Callable[..., AsyncGenerator[Any, None]]:
@@ -27,13 +27,13 @@ def fix_to_generator(fix) -> Callable[..., AsyncGenerator[Any, None]]:
 
 class ChildFixture:
     def __init__(self, name: str, callback: Callable[..., AsyncGenerator[Any, None]], params: Set[str],
-                 dependencies: List[str], autouse: bool):
+                 dependencies: List[str], autoskip: bool):
         self.name = name
         self.callback = callback
         self.params = params
         self.dependencies = dependencies
         # note that parameters can become dependencies down the line
-        self.autouse = autouse
+        self.autoskip = autoskip
 
     @classmethod
     def from_function(cls, func: Callable, name: Optional[str],
@@ -56,7 +56,7 @@ class ConcurrentFixtureGroup:
                  scope: Union[str, Callable[..., str]] = 'function',
                  parent_fixture_name: Optional[str] = None,
                  fixture_namespace: Union[Dict[str, Any], int] = 1,
-                 autouse_children: bool = True,
+                 autoskip_children: bool = False,
                  ):
         if isinstance(fixture_namespace, int):
             fixture_namespace = stack()[fixture_namespace].frame.f_globals
@@ -70,17 +70,17 @@ class ConcurrentFixtureGroup:
         }
         self.topology = Topology()
         self.children: Dict[str, ChildFixture] = {}
-        self.autouse_children = autouse_children
+        self.autoskip_children = autoskip_children
 
         self.all_params = {'request', 'event_loop'}
 
-    def inject(self):
+    def _inject(self):
         self.namespace[self.parent_fixture_name] = asyncio_fixture(self._parent_func(), name=self.parent_fixture_name,
                                                                    **self.fixture_params)
 
-    def fixture(self, func=None, *, name: Optional[str] = None, autouse: Optional[bool] = None):
+    def fixture(self, func=None, *, name: Optional[str] = None, autoskip: Optional[bool] = None):
         if func is None:
-            return partial(self.fixture, autouse=autouse, name=name)
+            return partial(self.fixture, autoskip=autoskip, name=name)
         if name is None:
             name = func.__name__
         if name in self.children:
@@ -88,11 +88,11 @@ class ConcurrentFixtureGroup:
         if name in ('event_loop', 'request'):
             raise ValueError(f"fixture {name} is reserved")
 
-        if autouse is None:
-            autouse = self.autouse_children
+        if autoskip is None:
+            autoskip = self.autoskip_children
 
         child = ChildFixture.from_function(func, name=name, known_dependency_names=self.topology.keys(),
-                                           autouse=autouse)
+                                           autoskip=autoskip)
         self.topology.add_node(name)
         self.children[name] = child
 
@@ -109,7 +109,7 @@ class ConcurrentFixtureGroup:
 
         self.all_params.update(child.params)
         self.all_params.discard(name)
-        self.inject()
+        self._inject()
 
         ns: Dict[str, Any] = {}
         body = dedent(f"""
@@ -127,6 +127,32 @@ class ConcurrentFixtureGroup:
         return fixture(ns['child'], scope=self.fixture_params['scope'])  # type: ignore[arg-type]
 
     async def _handle_topological_generators(self, event_loop, params: Dict[str, Any], include_only: Set[str]):
+        async def do_teardown(order: TopologicalExecution) -> List[Exception]:
+            pending_teardowns = set()
+            teardown_tasks: Dict[Task, str] = {}
+            errors = []
+            while order:
+                for name in order.submit_ready():
+                    generator = generators[name]
+                    teardown_task = event_loop.create_task(generator.__anext__())
+                    teardown_tasks[teardown_task] = name
+                    pending_teardowns.add(teardown_task)
+
+                (completed, pending_teardowns) = await wait(pending_teardowns, return_when=FIRST_COMPLETED)
+                for task in completed:
+                    name = teardown_tasks.pop(task)
+                    try:
+                        await task
+                    except StopAsyncIteration:
+                        pass
+                    except Exception as e:
+                        errors.append(e)
+                    else:
+                        errors.append(RuntimeError(f"async fixture {name} should only yield once"))
+                    finally:
+                        order.complete(name)
+            return errors
+
         generators: Dict[str, AsyncGenerator[Any, None]] = {}
         ret = SimpleNamespace()
 
@@ -136,8 +162,7 @@ class ConcurrentFixtureGroup:
         startup_errs = []
         initialized = set()
         while startup_order:
-            new_ready = startup_order.submit_ready()
-            for name in new_ready:
+            for name in startup_order.submit_ready():
                 child = self.children[name]
                 child_params = {p: params[p] for p in chain(child.params, child.dependencies)}
                 generator = generators[name] = child.callback(**child_params)
@@ -163,30 +188,7 @@ class ConcurrentFixtureGroup:
         if startup_errs:
             # we need to teardown all the initialized fixtures
             teardown_order = self.topology.execution(initialized, reverse=True)
-            teardown_errs = []
-            pending_teardowns = set()
-            teardown_tasks: Dict[Task, str] = {}
-            while teardown_order:
-                new_ready = teardown_order.submit_ready()
-                for name in new_ready:
-                    generator = generators[name]
-                    teardown_task = event_loop.create_task(generator.__anext__())
-                    teardown_tasks[teardown_task] = name
-                    pending_teardowns.add(teardown_task)
-
-                (completed, pending_teardowns) = await wait(pending_teardowns, return_when=FIRST_COMPLETED)
-                for task in completed:
-                    name = teardown_tasks.pop(task)
-                    try:
-                        await task
-                    except StopAsyncIteration:
-                        pass
-                    except Exception as e:
-                        teardown_errs.append(e)
-                    else:
-                        teardown_errs.append(RuntimeError(f"async fixture {name} should only yield once"))
-                    finally:
-                        teardown_order.complete(name)
+            teardown_errs = await do_teardown(teardown_order)
 
             if len(startup_errs) == 1 and not teardown_errs:
                 raise startup_errs[0]
@@ -204,30 +206,7 @@ class ConcurrentFixtureGroup:
         yield ret
 
         teardown_order = self.topology.execution(include_only, reverse=True)
-        teardown_errs = []
-        pending_teardowns = set()
-        teardown_tasks = {}
-        while teardown_order:
-            new_ready = teardown_order.submit_ready()
-            for name in new_ready:
-                generator = generators[name]
-                teardown_task = event_loop.create_task(generator.__anext__())
-                teardown_tasks[teardown_task] = name
-                pending_teardowns.add(teardown_task)
-
-            (completed, pending_teardowns) = await wait(pending_teardowns, return_when=FIRST_COMPLETED)
-            for task in completed:
-                name = teardown_tasks.pop(task)
-                try:
-                    await task
-                except StopAsyncIteration:
-                    pass
-                except Exception as e:
-                    teardown_errs.append(e)
-                else:
-                    teardown_errs.append(RuntimeError(f"async fixture {name} should only yield once"))
-                finally:
-                    teardown_order.complete(name)
+        teardown_errs = await do_teardown(teardown_order)
 
         if teardown_errs:
             if len(teardown_errs) == 1:
@@ -248,7 +227,7 @@ class ConcurrentFixtureGroup:
 
             include_only = {child_name
                             for child_name, child in self.children.items()
-                            if (child.autouse or child_name in all_fixtures)}
+                            if ((not child.autoskip) or child_name in all_fixtures)}
 
             async for v in self._handle_topological_generators(event_loop, params, include_only):
                 yield v
