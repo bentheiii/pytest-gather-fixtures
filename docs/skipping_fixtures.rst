@@ -24,12 +24,12 @@ used in any test that uses any fixture from that group.
         # fixture_2 is included in this test because its sibling fixture_1 is used.
         assert some_global_state == {'fixture_1', 'fixture_2'}
 
-This behaviour can be changed by setting the group's ``autoskip_children`` to ``True``.
+This behaviour can be changed by setting the group's ``autoskip`` to ``True``.
 
 .. code-block::
     :emphasize-lines: 1
 
-    my_group = ConcurrentFixtureGroup('my_group', autoskip_children=True)
+    my_group = ConcurrentFixtureGroup('my_group', autoskip=True)
 
     some_global_state = set()
 

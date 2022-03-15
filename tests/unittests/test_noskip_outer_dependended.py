@@ -4,7 +4,7 @@ from pytest import fixture
 
 from pytest_gather_fixtures import ConcurrentFixtureGroup
 
-Foo = ConcurrentFixtureGroup('Foo', autoskip_children=False)
+Foo = ConcurrentFixtureGroup('Foo', autoskip=False)
 
 
 @Foo.fixture

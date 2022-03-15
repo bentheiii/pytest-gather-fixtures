@@ -56,7 +56,7 @@ class ConcurrentFixtureGroup:
                  scope: Union[str, Callable[..., str]] = 'function',
                  parent_fixture_name: Optional[str] = None,
                  fixture_namespace: Union[Dict[str, Any], int] = 1,
-                 autoskip_children: bool = False,
+                 autoskip: bool = False,
                  ):
         if isinstance(fixture_namespace, int):
             fixture_namespace = stack()[fixture_namespace].frame.f_globals
@@ -70,7 +70,7 @@ class ConcurrentFixtureGroup:
         }
         self.topology = Topology()
         self.children: Dict[str, ChildFixture] = {}
-        self.autoskip_children = autoskip_children
+        self.autoskip = autoskip
 
         self.all_params = {'request', 'event_loop'}
 
@@ -89,7 +89,7 @@ class ConcurrentFixtureGroup:
             raise ValueError(f"fixture {name} is reserved")
 
         if autoskip is None:
-            autoskip = self.autoskip_children
+            autoskip = self.autoskip
 
         child = ChildFixture.from_function(func, name=name, known_dependency_names=self.topology.keys(),
                                            autoskip=autoskip)
