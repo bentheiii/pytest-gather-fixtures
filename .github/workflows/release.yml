@@ -27,7 +27,9 @@ jobs:
           ${{ runner.os }}-pip-
     - name: Install dependencies
       run: |
-        sh scripts/install.sh
+        pip install poetry
+        poetry update --lock
+        poetry install 
     - name: Assert Version Correctness
       run: |
         TOML_VER=$(poetry version | awk -F' ' '{ print $2 }')

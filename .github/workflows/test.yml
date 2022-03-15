@@ -31,7 +31,9 @@ jobs:
           ${{ runner.os }}-pip-
     - name: Install dependencies
       run: |
-        sh scripts/install.sh
+        pip install poetry
+        poetry update --lock
+        poetry install
     - name: Lint
       run: |
         poetry run sh scripts/lint.sh
