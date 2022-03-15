@@ -29,14 +29,14 @@ jobs:
       run: |
         pip install poetry
         poetry update --lock
-        poetry install 
+        poetry install
     - name: Assert Version Correctness
       run: |
         TOML_VER=$(poetry version | awk -F' ' '{ print $2 }')
         echo toml "$TOML_VER"
         GIT_VER=${{ github.event.release.tag_name }}
         echo git "$GIT_VER"
-        LIB_VER=$(python -c "exec(open('pytest-gather-fixtures/_version.py').read()); print(__version__)")
+        LIB_VER=$(python -c "exec(open('pytest_gather_fixtures/_version.py').read()); print(__version__)")
         echo lib "$LIB_VER"
         [[ "$TOML_VER" == "$GIT_VER" ]]
         [[ "$TOML_VER" == "$LIB_VER" ]]
