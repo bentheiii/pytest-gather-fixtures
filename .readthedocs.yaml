@@ -8,7 +8,7 @@ build:
     post_create_environment:
       # Install poetry
       # https://python-poetry.org/docs/#installing-manually
-      - pip install poetry
+      - pip install poetry==1.7.1
     post_install:
       # Install dependencies with all dependencies
       # VIRTUAL_ENV needs to be set manually for now.

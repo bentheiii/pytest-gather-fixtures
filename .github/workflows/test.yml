@@ -39,7 +39,7 @@ jobs:
         pip install poetry
         poetry update --lock
         poetry install
-        pip install pytest=${{ matrix.lib_versions.pytest_version }} pytest-asyncio=${{ matrix.lib_versions.pytest_asyncio_version }}
+        pip install "pytest=${{ matrix.lib_versions.pytest_version }}" "pytest-asyncio=${{ matrix.lib_versions.pytest_asyncio_version }}""
     - name: Lint
       run: |
         poetry run sh scripts/lint.sh
