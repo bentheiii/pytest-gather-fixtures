@@ -2,8 +2,8 @@ from contextlib import contextmanager
 from itertools import chain
 from typing import Iterable
 
-from pytest import fixture
 import pytest_asyncio
+from pytest import fixture
 
 # WARNING: This test suite is essentially using pytest to check itself, what follows is not for the faint of heart.
 
