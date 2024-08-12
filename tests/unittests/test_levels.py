@@ -22,7 +22,8 @@ async def s2(parallel_checker):
 
 
 @Foo.fixture
-async def s3(parallel_checker):
+async def s3(parallel_checker, teardown_second_parallel_check):
+    # we add the teardown fixture to make sure that the teardown is run in the correct order
     with parallel_checker.context('3_start'):
         await sleep(0.1)
     yield 3
@@ -31,7 +32,8 @@ async def s3(parallel_checker):
 
 
 @Foo.fixture
-async def s4(parallel_checker):
+async def s4(parallel_checker, teardown_second_parallel_check):
+    # we add the teardown fixture to make sure that the teardown is run in the correct order
     with parallel_checker.context('4_start'):
         await sleep(0.2)
     yield 4
@@ -88,7 +90,7 @@ def teardown_first_parallel_check(parallel_checker):
     )
 
 
-def test_second(teardown_second_parallel_check, s1, s2, s3, s4, b1, b2, parallel_checker, check_1_run):
+def test_second(s1, s2, s3, s4, b1, b2, parallel_checker, check_1_run, teardown_second_parallel_check):
     assert check_1_run == [True]
     assert s1 == 1
     assert s2 == 2

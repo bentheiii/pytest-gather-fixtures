@@ -2,9 +2,9 @@ name: Test
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -12,7 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.8, 3.9, '3.10']
+        python-version: [3.8, 3.9, '3.10', '3.11', '3.12']
+        lib_versions:
+          - pytest_version: ">=8.0.0"
+            pytest_asyncio_version: ">=0.23.0"
+          - pytest_version: "<8.0.0"
+            pytest_asyncio_version: "<0.22.0"
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python
@@ -34,6 +39,7 @@ jobs:
         pip install poetry
         poetry update --lock
         poetry install
+        pip install "pytest${{ matrix.lib_versions.pytest_version }}" "pytest-asyncio${{ matrix.lib_versions.pytest_asyncio_version }}"
     - name: Lint
       run: |
         poetry run sh scripts/lint.sh

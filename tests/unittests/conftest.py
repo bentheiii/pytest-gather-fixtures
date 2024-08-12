@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from itertools import chain
 from typing import Iterable
 
+import pytest_asyncio
 from pytest import fixture
 
 # WARNING: This test suite is essentially using pytest to check itself, what follows is not for the faint of heart.
@@ -61,7 +62,8 @@ def parallel_checker():
     return ParallelChecker()
 
 
-@fixture(scope="session")
-def event_loop():
-    from asyncio import get_event_loop
-    return get_event_loop()
+if pytest_asyncio.__version__.split(".") < ["0", "23", "0"]:
+    @fixture(scope="session")
+    def event_loop():
+        from asyncio import get_event_loop
+        return get_event_loop()
