@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from asyncio import FIRST_COMPLETED, Task, wait
+from asyncio import FIRST_COMPLETED, Task, get_running_loop, wait
 from functools import partial
 from inspect import isasyncgenfunction, signature, stack
 from itertools import chain
@@ -72,7 +72,7 @@ class ConcurrentFixtureGroup:
         self.children: Dict[str, ChildFixture] = {}
         self.autoskip = autoskip
 
-        self.all_params = {'request', 'event_loop'}
+        self.all_params = {'request'}
 
     def _inject(self):
         self.namespace[self.parent_fixture_name] = asyncio_fixture(self._parent_func(), name=self.parent_fixture_name,
@@ -217,8 +217,9 @@ class ConcurrentFixtureGroup:
             )
 
     def _parent_func(self):
-        async def inner(request, event_loop, **kwargs):
+        async def inner(request, **kwargs):
             all_fixtures = frozenset(request.fixturenames)
+            event_loop = get_running_loop()
             params = {
                 **kwargs,
                 'request': request,

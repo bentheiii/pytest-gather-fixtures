@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pytest-gather-fixtures"
-version = "0.1.1"
+version = "0.2.0"
 description = "set up asynchronous pytest fixtures concurrently"
 authors = ["Biocatch LTD <serverteam@biocatch.com>"]
 license = "MIT"
@@ -8,10 +8,10 @@ readme = "README.md"
 repository = "https://github.com/bentheiii/pytest-gather-fixtures"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 
-pytest = ">=6.0.0"
-pytest-asyncio = ">=0.18.1"
+pytest = ">=7.0.0"
+pytest-asyncio = ">=0.21.0"
 
 [tool.poetry.dev-dependencies]
 flake8 = "*"
