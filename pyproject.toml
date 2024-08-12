@@ -14,7 +14,7 @@ pytest = ">=7.0.0"
 pytest-asyncio = ">=0.21.0"
 
 [tool.poetry.dev-dependencies]
-flake8 = "*"
+flake8 = "^5.0.0"
 isort = "^5.9.1"
 mypy = "^0.902"
 sphinx = "*"
