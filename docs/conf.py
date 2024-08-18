@@ -60,8 +60,9 @@ else:
     except Exception:
         pass
 
-root_dir = Path(find_spec("pytest_gather_fixtures").submodule_search_locations[0])
-base_url = "https://github.com/bentheiii/pytest-gather-fixtures/"
+source_root = "pytest_gather_fixtures"
+root_dir = Path(find_spec(source_root).submodule_search_locations[0])
+base_url = "https://github.com/bentheiii/pytest-gather-fixtures"
 
 
 def linkcode_resolve(domain, info):
@@ -73,7 +74,7 @@ def linkcode_resolve(domain, info):
             package_file = root_dir / info["module"].replace(".", "/") / "__init__.py"
             if not package_file.exists():
                 raise FileNotFoundError
-        blob = project / Path(package_file).relative_to(root_dir)
+        blob = source_root / Path(package_file).relative_to(root_dir)
         walk = NodeWalk.from_file(package_file)
         try:
             decl = walk.get_last(info["fullname"])
