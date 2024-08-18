@@ -7,7 +7,18 @@ from itertools import chain
 from textwrap import dedent
 from traceback import format_exception
 from types import SimpleNamespace
-from typing import Any, AsyncGenerator, Callable, Container, Dict, List, Optional, Set, Union
+from typing import (
+    Any,
+    AsyncGenerator,
+    Callable,
+    Container,
+    Dict,
+    List,
+    Literal,
+    Optional,
+    Set,
+    Union,
+)
 
 from pytest import fixture
 from pytest_asyncio import fixture as asyncio_fixture
@@ -26,8 +37,14 @@ def fix_to_generator(fix) -> Callable[..., AsyncGenerator[Any, None]]:
 
 
 class ChildFixture:
-    def __init__(self, name: str, callback: Callable[..., AsyncGenerator[Any, None]], params: Set[str],
-                 dependencies: List[str], autoskip: bool):
+    def __init__(
+        self,
+        name: str,
+        callback: Callable[..., AsyncGenerator[Any, None]],
+        params: Set[str],
+        dependencies: List[str],
+        autoskip: bool,
+    ):
         self.name = name
         self.callback = callback
         self.params = params
@@ -36,12 +53,17 @@ class ChildFixture:
         self.autoskip = autoskip
 
     @classmethod
-    def from_function(cls, func: Callable, name: Optional[str],
-                      known_dependency_names: Container[str], **kwargs) -> 'ChildFixture':
+    def from_function(
+        cls,
+        func: Callable,
+        name: Optional[str],
+        known_dependency_names: Container[str],
+        **kwargs,
+    ) -> "ChildFixture":
         name = name or func.__name__
         params = set()
         dependencies = []
-        for param in signature(func).parameters.keys():
+        for param in signature(func).parameters:
             if param in known_dependency_names:
                 dependencies.append(param)
             else:
@@ -50,49 +72,76 @@ class ChildFixture:
         return cls(name, fix_to_generator(func), params, dependencies, **kwargs)
 
 
+ScopeName = Literal["session", "package", "module", "class", "function"]
+
+
 class ConcurrentFixtureGroup:
-    def __init__(self, name: str, *,
-                 autouse: bool = False,
-                 scope: Union[str, Callable[..., str]] = 'function',
-                 parent_fixture_name: Optional[str] = None,
-                 fixture_namespace: Union[Dict[str, Any], int] = 1,
-                 autoskip: bool = False,
-                 ):
+    def __init__(
+        self,
+        name: str,
+        *,
+        autouse: bool = False,
+        scope: Union[ScopeName, Callable[..., ScopeName]] = "function",
+        parent_fixture_name: Optional[str] = None,
+        fixture_namespace: Union[Dict[str, Any], int] = 1,
+        autoskip: bool = False,
+        parent_fixture_factory: Callable[..., Any] = asyncio_fixture,
+        child_fixture_factory: Callable[..., Any] = fixture,
+    ):
         if isinstance(fixture_namespace, int):
             fixture_namespace = stack()[fixture_namespace].frame.f_globals
 
         self.__name__ = name
         self.namespace = fixture_namespace
-        self.parent_fixture_name = parent_fixture_name or '_cfg_' + self.__name__
+        self.parent_fixture_name = parent_fixture_name or "_cfg_" + self.__name__
         self.fixture_params = {
-            'scope': scope,
-            'autouse': autouse,
+            "scope": scope,
+            "autouse": autouse,
         }
         self.topology = Topology()
         self.children: Dict[str, ChildFixture] = {}
         self.autoskip = autoskip
 
-        self.all_params = {'request'}
+        self.parent_fixture_factory = parent_fixture_factory
+        self.child_fixture_factory = child_fixture_factory
+
+        self.all_params = {"request"}
 
     def _inject(self):
-        self.namespace[self.parent_fixture_name] = asyncio_fixture(self._parent_func(), name=self.parent_fixture_name,
-                                                                   **self.fixture_params)
+        self.namespace[self.parent_fixture_name] = self.parent_fixture_factory(
+            self._parent_func(),
+            name=self.parent_fixture_name,
+            **self.fixture_params,  # type: ignore[arg-type]
+        )
 
-    def fixture(self, func=None, *, name: Optional[str] = None, autoskip: Optional[bool] = None):
+    def fixture(
+        self,
+        func=None,
+        *,
+        name: Optional[str] = None,
+        autoskip: Optional[bool] = None,
+        factory: Union[Callable[..., Any], None] = None,
+    ):
         if func is None:
             return partial(self.fixture, autoskip=autoskip, name=name)
         if name is None:
             name = func.__name__
         if name in self.children:
             raise ValueError(f"fixture {name} already exists")
-        if name in ('event_loop', 'request'):
+        if name in ("event_loop", "request"):
             raise ValueError(f"fixture {name} is reserved")
+        if factory is None:
+            factory = self.child_fixture_factory
 
         if autoskip is None:
             autoskip = self.autoskip
 
-        child = ChildFixture.from_function(func, name=name, known_dependency_names=self.topology.keys(),
-                                           autoskip=autoskip)
+        child = ChildFixture.from_function(
+            func,
+            name=name,
+            known_dependency_names=self.topology.keys(),
+            autoskip=autoskip,
+        )
         self.topology.add_node(name)
         self.children[name] = child
 
@@ -120,11 +169,14 @@ class ConcurrentFixtureGroup:
         if name != func.__name__:
             # if the fixture needs a different name, we need to inject the new name into the namespace, same as we did
             # the parent
-            self.namespace[name] = fixture(ns['child'], scope=self.fixture_params['scope'])  # type: ignore[arg-type]
+            self.namespace[name] = factory(
+                ns["child"],
+                scope=self.fixture_params["scope"],
+            )
             return func
         # if the fixture doesn't need a different name, we can just return the fixture, and let the decorator shadow the
         # original name
-        return fixture(ns['child'], scope=self.fixture_params['scope'])  # type: ignore[arg-type]
+        return factory(ns["child"], scope=self.fixture_params["scope"])
 
     async def _handle_topological_generators(self, event_loop, params: Dict[str, Any], include_only: Set[str]):
         async def do_teardown(order: TopologicalExecution) -> List[Exception]:
@@ -145,7 +197,7 @@ class ConcurrentFixtureGroup:
                         await task
                     except StopAsyncIteration:
                         pass
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001
                         errors.append(e)
                     else:
                         errors.append(RuntimeError(f"async fixture {name} should only yield once"))
@@ -175,7 +227,7 @@ class ConcurrentFixtureGroup:
                 name = startup_tasks.pop(task)
                 try:
                     result = await task
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     startup_errs.append(e)
                     startup_order.cancel_all_unsubmitted()
                 else:
@@ -192,14 +244,12 @@ class ConcurrentFixtureGroup:
 
             if len(startup_errs) == 1 and not teardown_errs:
                 raise startup_errs[0]
-            exc_string = (
-                    'multiple exceptions during startup of group:\n'
-                    + '\n'.join(''.join(format_exception(None, e, e.__traceback__)) for e in startup_errs)
+            exc_string = "multiple exceptions during startup of group:\n" + "\n".join(
+                "".join(format_exception(None, e, e.__traceback__)) for e in startup_errs
             )
             if teardown_errs:
-                exc_string += (
-                        '\nin addition to the following exceptions during teardown:\n'
-                        + '\n'.join(''.join(format_exception(None, e, e.__traceback__)) for e in teardown_errs)
+                exc_string += "\nin addition to the following exceptions during teardown:\n" + "\n".join(
+                    "".join(format_exception(None, e, e.__traceback__)) for e in teardown_errs
                 )
             raise Exception(exc_string)
 
@@ -212,8 +262,8 @@ class ConcurrentFixtureGroup:
             if len(teardown_errs) == 1:
                 raise teardown_errs[0]
             raise Exception(
-                'multiple exceptions during teardown of group:'
-                + '\n'.join(''.join(format_exception(None, e, e.__traceback__)) for e in teardown_errs)
+                "multiple exceptions during teardown of group:"
+                + "\n".join("".join(format_exception(None, e, e.__traceback__)) for e in teardown_errs)
             )
 
     def _parent_func(self):
@@ -222,13 +272,15 @@ class ConcurrentFixtureGroup:
             event_loop = get_running_loop()
             params = {
                 **kwargs,
-                'request': request,
-                'event_loop': event_loop,
+                "request": request,
+                "event_loop": event_loop,
             }
 
-            include_only = {child_name
-                            for child_name, child in self.children.items()
-                            if ((not child.autoskip) or child_name in all_fixtures)}
+            include_only = {
+                child_name
+                for child_name, child in self.children.items()
+                if ((not child.autoskip) or child_name in all_fixtures)
+            }
 
             async for v in self._handle_topological_generators(event_loop, params, include_only):
                 yield v
@@ -238,12 +290,12 @@ class ConcurrentFixtureGroup:
                         async for v in inner({all_params_keyed}):
                             yield v
                     """).format(
-            all_param_names=','.join(self.all_params),
-            all_params_keyed=','.join(f'{k}={k}' for k in self.all_params)
+            all_param_names=",".join(self.all_params),
+            all_params_keyed=",".join(f"{k}={k}" for k in self.all_params),
         )
 
-        exec_namespace = {'inner': inner}
+        exec_namespace = {"inner": inner}
 
         exec(body, exec_namespace)
 
-        return exec_namespace['parent']
+        return exec_namespace["parent"]

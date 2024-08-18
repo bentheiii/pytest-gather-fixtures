@@ -34,7 +34,7 @@ Spooky Behaviour When Parameterizing Fixture Groups
 Note that when a child fixture is parameterized, all of its siblings are also parameterized in the same way.
 
 .. code-block::
-    :emphasize-lines: 17, 23, 29
+    :emphasize-lines: 17, 23, 29, 35, 40
 
     @pytest.fixture(params=[0, 1])
     def base2(request):

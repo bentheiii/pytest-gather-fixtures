@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Generic, Iterable, List, Set, TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class TopologicNode:
@@ -35,7 +35,11 @@ class Topology:
         parent_node.depended_by.append(child_node)
         child_node.depends_on.append(parent_node)
 
-    def execution(self, include_only: Set[str], reverse: bool = False, ):
+    def execution(
+        self,
+        include_only: Set[str],
+        reverse: bool = False,
+    ):
         return TopologicalExecution(self, include_only, reverse)
 
     def get_ancestors(self, children: Iterable[str], reverse) -> Set[str]:
@@ -112,5 +116,5 @@ class TopologicalExecution(Generic[T]):
 
     def __bool__(self) -> bool:
         if self.pending and not (self.ready or self.submitted):
-            raise RuntimeError(f'Circular dependency detected: {[(p.name, w) for (p, w) in self.pending.items()]}')
+            raise RuntimeError(f"Circular dependency detected: {[(p.name, w) for (p, w) in self.pending.items()]}")
         return bool(self.pending or self.ready or self.submitted)

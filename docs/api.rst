@@ -9,7 +9,8 @@ API Refernce
 .. class:: ConcurrentFixtureGroup(name: str, *, autouse: bool = False, \
         scope: ... = 'function', parent_fixture_name: str | None = None, \
         fixture_namespace: dict[str, typing.Any] | int = 1, \
-        autoskip: bool = True)
+        autoskip: bool = True, parent_fixture_factory: collections.abc.Callable[..., typing.Any] = ..., \
+        child_fixture_factory: collections.abc.Callable[..., typing.Any] = ...)
 
     A group of fixtures that can be run concurrently. Aggregates "child fixtures" into tasks that are run in parallel.
 
@@ -27,11 +28,14 @@ API Refernce
         :ref:`abstract:Namespace Injection` for more information. If set to an integer, will use
         the global namespace of a frame in the callstack with that number. Default is to use the caller's global
         namespace.
-    :param autoskip: whether to automatically use all child fixtures, see
+    :param autoskip: whether to automatically skip all child fixtures, see
         :ref:`skipping_fixtures:Skipping Child Fixtures` for more information.
+    :param parent_fixture_factory: the factory function to create the parent fixture. Defaults to pytest-asyncio's
+        ``fixture``.
+    :param child_fixture_factory: the factory function to create the child fixtures. Defaults to pytests's ``fixture``.
 
-    .. method:: fixture(func, *, name: str|None = None, autoskip: Optional[bool] = None)
-                fixture(*, name: str|None = None, autoskip: Optional[bool] = None)
+    .. method:: fixture(func, *, name: str|None = None, autoskip: Optional[bool] = None, factory: collections.abc.Callable[..., typing.Any] = ...)
+                fixture(*, name: str|None = None, autoskip: Optional[bool] = None, factory: collections.abc.Callable[..., typing.Any] = ...)
 
         Register a fixture function to the group. Should be used as a decorator.
 
@@ -41,5 +45,7 @@ API Refernce
             the decorated function.
         :param autoskip: whether to automatically use this fixture whenever the parent is used. Defaults to the group
             instance's ``autoskip``. see :ref:`skipping_fixtures:Skipping Child Fixtures` for more information.
+        :param factory: the factory function to create the fixture. Defaults to the group instance's
+            ``child_fixture_factory``.
         :return: the decorated function if ``name`` is assigned, otherwise the fixture that should replace the function
             by decorator.
