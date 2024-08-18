@@ -40,7 +40,7 @@ class ParallelChecker:
                 if con_group >= expected_group:
                     break
             else:
-                assert False, f"{expected_group} not in contexts, found {self.contexts}"
+                raise AssertionError(f"{expected_group} not in contexts, found {self.contexts}")
 
     def assert_not_concurrent(self, *ordered_groups: Iterable[Iterable[str]]):
         all_elements = set(chain.from_iterable(ordered_groups))
@@ -48,7 +48,7 @@ class ParallelChecker:
         next_group = set(next(groups_iter))
         for group in self.context_groups():
             if len(all_elements & group) > 1:
-                assert False, f"{all_elements & group} in parallel, found {self.contexts}"
+                raise AssertionError(f"{all_elements & group} in parallel, found {self.contexts}")
             next_group -= group
             if not next_group:
                 try:
@@ -63,7 +63,9 @@ def parallel_checker():
 
 
 if pytest_asyncio.__version__.split(".") < ["0", "23", "0"]:
+
     @fixture(scope="session")
     def event_loop():
         from asyncio import get_event_loop
+
         return get_event_loop()
